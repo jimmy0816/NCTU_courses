@@ -1,53 +1,73 @@
 #include <iostream>
 #include <stdio.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
+#include <stdlib.h>
 #include <netinet/in.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <time.h>
+#include <string.h>
 #include <arpa/inet.h>
+
+#define BUFFER 1024
+#define PORT 7777
 
 using namespace std;
 
 int main(int argc, char **argv)
 {
-	char *server_ip = argv[1];
-	int server_port = atoi(argv[2]);
-	struct sockaddr_in addr;
-	struct sockaddr_in cl_addr;
-	int sockfd;
-	int ret;
-
-
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(sockfd < 0){
-		printf("error: creating socket.\n");
+    int sockfd;
+    char *server_ip = argv[1];
+    int server_port = atoi(argv[2]);
+    struct sockaddr_in dest;
+    char buffer[BUFFER];
+    int ret, rcv, snd;
+    
+    // # of argumetn must be three
+    if(argc != 3){
+    	exit(1);
+    }
+    
+    // create client socket : (domain,type,protocol)
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);	
+    if(sockfd < 0){
+		printf("error: creating socket \n");
 		exit(1);
-	}
-	
-	memset(&addr, 0, sizeof(addr));  
-	addr.sin_family = AF_INET;  
-	addr.sin_addr.s_addr = inet_addr(server_ip);
-	addr.sin_port = server_port;
-	
-	ret = connect(sockfd, (struct sockaddr *) &addr, sizeof(addr));  
-	if (ret < 0) {  
-		printf("error: connecting to the server.\n");  
-		exit(1);  
-	}  
-	printf("%s %d\n", server_ip, server_port);
-	cout<< sockfd << endl << ret << endl;
+    }
+    
+    // initialize the server structure dest 
+    bzero(&dest, sizeof(dest));
+    dest.sin_family= AF_INET;
+    dest.sin_port= htons(server_port);			// wait know: htons
+    dest.sin_addr.s_addr= inet_addr(server_ip);
 
-	return 0;	
+	// create connetcion : (int sd, struct sockaddr *server, int addr_len)
+    ret = connect(sockfd, (struct sockaddr *)&dest, sizeof(dest));
+    if(ret < 0){
+		printf("error: connecting error\n");
+		exit(1);
+    }
+	printf("Connect successfully!\n");
+	
+    while(1){
+		memset(buffer, 0, sizeof (buffer));
+
+		// receive : (sockfd, buf, len, flags)
+		rcv = recv (sockfd, buffer, BUFFER, 0);
+		if(rcv > 0){
+		   printf("[Server] %s\n", buffer);
+		}
+		
+		// enter command
+		memset(buffer, 0, sizeof (buffer));
+		fgets(buffer, BUFFER, stdin);
+		// only process exit command
+		if(!(strncmp (buffer, "exit", 4))){
+			exit(1);
+		}
+		// send(sockfd, buf, len, flags)
+		snd = send(sockfd, buffer, strlen(buffer), 0);
+    }
+    close(sockfd);
+    return 0;
 }
-/*
-struct in_addr {
-   in_addr_t   	s_addr;			// 32-bit IPv4 address, network byte order 	
-};
-struct sockaddr_in {
-   uint8_t		sin_len;		// length of structure 
-   sa_family_t	sin_family;		// AF_INET 
-   in_port_t	sin_port;		// 16-bit port#, network byte order 
-   struct in_addr  	sin_addr;	// 32-bit IPv4 address, network byte order 
-   char 		sin_zero[8];	// unused 				
-};
-*/
